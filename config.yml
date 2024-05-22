@@ -1,0 +1,12 @@
+
+handler:
+  host : localhost
+  port : 9082
+storage-handler:
+  host : localhost
+  port : 9083
+dispatcher:
+  host: localhost
+  port:
+cycle-length: 10
+#modify if needed the hosts/ports

@@ -1,0 +1,6 @@
+.env
+
+.idea/
+uploads/
+go.work
+*.sum
