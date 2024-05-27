@@ -1,6 +1,6 @@
 module gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-dispatcher
 
-go 1.22.1
+go 1.22.2
 
 require (
 	github.com/je4/utils/v2 v2.0.33
@@ -11,6 +11,7 @@ require (
 	gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-handler v0.0.5
 	gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-storage-handler v0.0.4
 	google.golang.org/grpc v1.64.0
+	google.golang.org/grpc/examples v0.0.0-20240523232201-f7d3d3eecbee
 )
 
 require (
