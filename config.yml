@@ -8,5 +8,5 @@ storage-handler:
 dispatcher:
   host: localhost
   port:
-cycle-length: 10
+cycle-length: 600
 #modify if needed the hosts/ports
