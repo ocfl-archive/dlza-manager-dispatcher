@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	"github.com/rs/zerolog"
 	"gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-dispatcher/configuration"
@@ -58,7 +57,7 @@ func main() {
 	}
 	defer connectionDispatcherStorageHandler.Close()
 
-	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, clientDispatcherStorageHandler)
+	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, clientDispatcherStorageHandler, daLogger)
 
 	for {
 		err = dispatcherHandlerService.GetLowQualityCollectionsAndAct()
@@ -66,6 +65,5 @@ func main() {
 			daLogger.Errorf("error in GetLowQualityCollectionsAndAct methos: %v", err)
 		}
 		time.Sleep(time.Duration(configObj.CycleLength) * time.Second)
-		fmt.Print("Check\n")
 	}
 }
