@@ -1,4 +1,4 @@
-module gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-dispatcher
+module github.com/ocfl-archive/dlza-manager-dispatcher
 
 go 1.22.3
 
@@ -7,9 +7,9 @@ require (
 	github.com/jinzhu/configor v1.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
-	gitlab.switch.ch/ub-unibas/dlza/dlza-manager v0.0.2
-	gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-handler v0.0.6
-	gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-storage-handler v0.0.5
+	github.com/ocfl-archive/dlza-manager v0.0.4
+	github.com/ocfl-archive/dlza-manager-handler v0.0.4
+	github.com/ocfl-archive/dlza-manager-storage-handler v0.0.4
 	google.golang.org/grpc v1.64.0
 )
 

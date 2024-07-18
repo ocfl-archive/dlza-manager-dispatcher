@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	zw "github.com/je4/utils/v2/pkg/zLogger"
+	handlerClient "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
+	storageHandlerClient "github.com/ocfl-archive/dlza-manager-storage-handler/storagehandlerproto"
+	pb "github.com/ocfl-archive/dlza-manager/dlzamanagerproto"
 	"github.com/pkg/errors"
-	pb "gitlab.switch.ch/ub-unibas/dlza/dlza-manager/dlzamanagerproto"
-	handlerClient "gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-handler/handlerproto"
-	storageHandlerClient "gitlab.switch.ch/ub-unibas/dlza/microservices/dlza-manager-storage-handler/storagehandlerproto"
 	"strconv"
 	"time"
 )
