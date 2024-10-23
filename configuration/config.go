@@ -1,22 +1,18 @@
 package configuration
 
 import (
+	"emperror.dev/errors"
 	"github.com/BurntSushi/toml"
-	loaderConfig "github.com/je4/certloader/v2/pkg/loader"
 	"github.com/je4/filesystem/v2/pkg/vfsrw"
 	"github.com/je4/utils/v2/pkg/config"
 	"github.com/je4/utils/v2/pkg/stashconfig"
-	"github.com/pkg/errors"
+	loaderConfig "go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
 	"io/fs"
 	"os"
 )
 
 type DispatcherConfig struct {
 	LocalAddr               string                `toml:"localaddr"`
-	HandlerAddr             string                `toml:"handleraddr"`
-	HandlerHost             string                `toml:"handlerhost"`
-	StorageHandlerAddr      string                `toml:"storagehandleraddr"`
-	StorageHandlerHost      string                `toml:"storagehandlerhost"`
 	CycleLength             int                   `toml:"cyclelength"`
 	Domain                  string                `toml:"domain"`
 	ExternalAddr            string                `toml:"externaladdr"`
@@ -28,7 +24,6 @@ type DispatcherConfig struct {
 	ResolverAddr            string                `toml:"resolveraddr"`
 	ResolverTimeout         config.Duration       `toml:"resolvertimeout"`
 	ResolverNotFoundTimeout config.Duration       `toml:"resolvernotfoundtimeout"`
-	WebTLS                  *loaderConfig.Config  `toml:"webtls"`
 	ClientTLS               *loaderConfig.Config  `toml:"client"`
 	LogFile                 string                `toml:"logfile"`
 	LogLevel                string                `toml:"loglevel"`

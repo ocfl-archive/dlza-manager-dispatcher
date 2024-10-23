@@ -3,22 +3,23 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"github.com/je4/certloader/v2/pkg/loader"
-	"github.com/je4/miniresolver/v2/pkg/resolver"
+	"fmt"
 	configutil "github.com/je4/utils/v2/pkg/config"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/configuration"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/service"
-	handlerClient "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
-	storageHandlerClient "github.com/ocfl-archive/dlza-manager-storage-handler/client"
-	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	handlerClientProto "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
+	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger/v2"
+	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
+	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -106,35 +107,52 @@ func main() {
 
 	//////DispatcherHandler gRPC connection
 
-	clientDispatcherHandler, err := resolver.NewClient[handlerClient.DispatcherHandlerServiceClient](resolverClient, handlerClient.NewDispatcherHandlerClient, mediaserverproto.Database_ServiceDesc.ServiceName, conf.Domain)
+	clientDispatcherHandler, err := resolver.NewClient[handlerClientProto.DispatcherHandlerServiceClient](
+		resolverClient,
+		handlerClientProto.NewDispatcherHandlerServiceClient,
+		handlerClientProto.DispatcherHandlerService_ServiceDesc.ServiceName, conf.Domain)
 	if err != nil {
-		logger.Panic().Msgf("cannot create dispatcher grpc client: %v", err)
+		logger.Panic().Msgf("cannot create mediaserverdb grpc client: %v", err)
 	}
+
 	resolver.DoPing(clientDispatcherHandler, logger)
+
+	//////DispatcherStorageHandler gRPC connection
 	/*
-		clientDispatcherHandler, connectionDispatcherHandler, err := handlerClient.NewDispatcherHandlerClient(conf.HandlerHost+conf.HandlerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		clientDispatcherStorageHandler, connectionDispatcherStorageHandler, err := storageHandlerClient.NewDispatcherStorageHandlerClient(conf.StorageHandlerHost+conf.StorageHandlerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			log.Fatalf("did not connect: %v", err)
 		}
-		defer connectionDispatcherHandler.Close()
+		defer connectionDispatcherStorageHandler.Close()
 
 	*/
 
-	//////DispatcherStorageHandler gRPC connection
+	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, nil, logger)
+	var end = make(chan struct{}, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			err = dispatcherHandlerService.GetLowQualityCollectionsAndAct()
+			if err != nil {
+				logger.Error().Msgf("error in GetLowQualityCollectionsAndAct method: %v", err)
+			}
+			select {
+			case <-end:
+				return
+			case <-time.After(time.Duration(conf.CycleLength) * time.Second):
+			}
 
-	clientDispatcherStorageHandler, connectionDispatcherStorageHandler, err := storageHandlerClient.NewDispatcherStorageHandlerClient(conf.StorageHandlerHost+conf.StorageHandlerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer connectionDispatcherStorageHandler.Close()
-
-	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, clientDispatcherStorageHandler, logger)
-
-	for {
-		err = dispatcherHandlerService.GetLowQualityCollectionsAndAct()
-		if err != nil {
-			logger.Error().Msgf("error in GetLowQualityCollectionsAndAct methos: %v", err)
 		}
-		time.Sleep(time.Duration(conf.CycleLength) * time.Second)
-	}
+	}()
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	fmt.Println("press ctrl+c to stop server")
+	s := <-done
+	fmt.Println("got signal:", s)
+	close(end)
+	wg.Wait()
+
 }

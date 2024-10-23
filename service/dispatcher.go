@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
+	"emperror.dev/errors"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	handlerClient "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
 	storageHandlerClient "github.com/ocfl-archive/dlza-manager-storage-handler/storagehandlerproto"
 	pb "github.com/ocfl-archive/dlza-manager/dlzamanagerproto"
-	"github.com/pkg/errors"
 	"strconv"
 	"time"
 )
