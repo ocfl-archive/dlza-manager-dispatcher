@@ -9,6 +9,7 @@ import (
 	"github.com/ocfl-archive/dlza-manager-dispatcher/configuration"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/service"
 	handlerClientProto "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
+	storageHandlerClientProto "github.com/ocfl-archive/dlza-manager-storage-handler/storageHandlerproto"
 	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger/v2"
 	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
 	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
@@ -118,16 +119,18 @@ func main() {
 	resolver.DoPing(clientDispatcherHandler, logger)
 
 	//////DispatcherStorageHandler gRPC connection
-	/*
-		clientDispatcherStorageHandler, connectionDispatcherStorageHandler, err := storageHandlerClient.NewDispatcherStorageHandlerClient(conf.StorageHandlerHost+conf.StorageHandlerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		defer connectionDispatcherStorageHandler.Close()
 
-	*/
+	clientDispatcherStorageHandler, err := resolver.NewClient[storageHandlerClientProto.DispatcherStorageHandlerServiceClient](
+		resolverClient,
+		storageHandlerClientProto.NewDispatcherStorageHandlerServiceClient,
+		storageHandlerClientProto.DispatcherStorageHandlerService_ServiceDesc.ServiceName, conf.Domain)
+	if err != nil {
+		logger.Panic().Msgf("cannot create mediaserverdb grpc client: %v", err)
+	}
 
-	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, nil, logger)
+	resolver.DoPing(clientDispatcherStorageHandler, logger)
+
+	dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, clientDispatcherStorageHandler, logger)
 	var end = make(chan struct{}, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
