@@ -24,14 +24,14 @@ type = "minivault"
 initialtimeout = "1h"
 [client.minivault]
 baseurl = "https://localhost:8759/api/v1"
-parenttoken = "pa.222e346b9d31eae7.34754b7a464c506b"
+parenttoken = "pa.222f36af242620a3.2e524f853f2a81c3"
 tokentype = "client_cert"
 tokenpolicies = ["ubdlza.dispatcher"]
 tokeninterval = "48h"
 tokenttl = "96h"
 certtype = "client_cert"
 dnss = []
-uris = ["grpc:ubdlza.handlerproto.DispatcherHandlerService","grpc:ubdlza.storageHandlerproto.DispatcherStorageHandlerService", "grpc:miniresolverproto.MiniResolver"]
+uris = ["grpc:ubdlza.handlerproto.DispatcherHandlerService","grpc:ubdlza.storagehandlerproto.DispatcherStorageHandlerService", "grpc:miniresolverproto.MiniResolver"]
 ips = []
 certinterval = "24h"
 certttl = "2h"

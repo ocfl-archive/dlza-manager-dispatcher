@@ -9,7 +9,7 @@ import (
 	"github.com/ocfl-archive/dlza-manager-dispatcher/configuration"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/service"
 	handlerClientProto "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
-	storageHandlerClientProto "github.com/ocfl-archive/dlza-manager-storage-handler/storageHandlerproto"
+	storageHandlerClientProto "github.com/ocfl-archive/dlza-manager-storage-handler/storagehandlerproto"
 	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger/v2"
 	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
 	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
