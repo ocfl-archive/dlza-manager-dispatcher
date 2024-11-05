@@ -113,7 +113,7 @@ func main() {
 		handlerClientProto.NewDispatcherHandlerServiceClient,
 		handlerClientProto.DispatcherHandlerService_ServiceDesc.ServiceName, conf.Domain)
 	if err != nil {
-		logger.Panic().Msgf("cannot create mediaserverdb grpc client: %v", err)
+		logger.Panic().Msgf("cannot create clientDispatcherHandler grpc client: %v", err)
 	}
 
 	resolver.DoPing(clientDispatcherHandler, logger)
