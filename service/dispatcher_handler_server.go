@@ -22,19 +22,17 @@ func NewDispatcherHandlerService(clientDispatcherHandler handlerClient.Dispatche
 }
 
 func (d *DispatcherHandlerService) GetLowQualityCollectionsAndAct() error {
-	c := context.Background()
-	cont, cancel := context.WithTimeout(c, 10000*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
-	collectionAliases, err := d.ClientDispatcherHandler.GetLowQualityCollections(cont, &pb.NoParam{})
+	collectionsWithObjectIdsToImproveQuality, err := d.ClientDispatcherHandler.GetLowQualityCollectionsWithObjectIds(ctx, &pb.NoParam{})
 
 	if err != nil {
-		return errors.Wrapf(err, "cannot get LowQualityCollections")
+		return errors.Wrapf(err, "cannot get GetLowQualityCollectionsWithObjectIds")
 	}
-	length := len(collectionAliases.CollectionAliases)
+	length := len(collectionsWithObjectIdsToImproveQuality.CollectionAliases)
 	if length != 0 {
 		d.Logger.Info("Trying to improve quality for "+strconv.Itoa(length)+" collections", time.Now())
-		_, err = d.ClientDispatcherStorageHandler.ChangeQualityForCollections(cont, collectionAliases)
+		_, err = d.ClientDispatcherStorageHandler.ChangeQualityForCollectionWithObjectIds(ctx, collectionsWithObjectIdsToImproveQuality)
 		if err != nil {
 			return errors.Wrapf(err, "cannot change quality of collections with low quality")
 		}
