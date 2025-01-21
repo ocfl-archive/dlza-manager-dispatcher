@@ -1,13 +1,13 @@
 module github.com/ocfl-archive/dlza-manager-dispatcher
 
-go 1.23.2
+go 1.23.3
 
 require (
 	emperror.dev/errors v0.8.1
 	github.com/BurntSushi/toml v1.4.0
 	github.com/je4/filesystem/v2 v2.0.15
 	github.com/je4/utils/v2 v2.0.51
-	github.com/ocfl-archive/dlza-manager v0.0.6
+	github.com/ocfl-archive/dlza-manager v0.0.8
 	github.com/ocfl-archive/dlza-manager-handler v0.0.8
 	github.com/ocfl-archive/dlza-manager-storage-handler v0.0.5
 	gitlab.switch.ch/ub-unibas/go-ublogger/v2 v2.0.1
