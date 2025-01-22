@@ -7,9 +7,9 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/je4/filesystem/v2 v2.0.15
 	github.com/je4/utils/v2 v2.0.56
-	github.com/ocfl-archive/dlza-manager v0.0.14
-	github.com/ocfl-archive/dlza-manager-handler v1.0.0
-	github.com/ocfl-archive/dlza-manager-storage-handler v1.0.0
+	github.com/ocfl-archive/dlza-manager v1.0.0-beta1
+	github.com/ocfl-archive/dlza-manager-handler v1.0.0-beta1
+	github.com/ocfl-archive/dlza-manager-storage-handler v1.0.0-beta1
 	gitlab.switch.ch/ub-unibas/go-ublogger/v2 v2.0.1
 	go.ub.unibas.ch/cloud/certloader/v2 v2.0.18
 	go.ub.unibas.ch/cloud/miniresolver/v2 v2.0.31
