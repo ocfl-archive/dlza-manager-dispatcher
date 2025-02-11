@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 	"emperror.dev/errors"
+	"fmt"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	handlerClient "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
 	storageHandlerClient "github.com/ocfl-archive/dlza-manager-storage-handler/storagehandlerproto"
 	pb "github.com/ocfl-archive/dlza-manager/dlzamanagerproto"
-	"strconv"
 	"time"
 )
 
@@ -33,7 +33,7 @@ func (d *DispatcherHandlerService) GetLowQualityCollectionsAndAct() error {
 	}
 	length := len(collectionAliases.CollectionAliases)
 	if length != 0 {
-		d.Logger.Info().Msgf("Trying to improve quality for "+strconv.Itoa(length)+" collections", time.Now())
+		d.Logger.Info().Msgf(fmt.Sprintf("Trying to improve quality for %d collections %v", length, time.Now()))
 		_, err = d.ClientDispatcherStorageHandler.ChangeQualityForCollectionWithObjectIds(cont, collectionAliases)
 		if err != nil {
 			return errors.Wrapf(err, "cannot change quality of collections with low quality")
