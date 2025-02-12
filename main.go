@@ -36,15 +36,14 @@ const (
 	notAvailable = "not available"
 )
 
-const amountOfWorker = 1
-const timeToWaiteWorker = 60
-
 var objectCash map[string]*dlzamanagerproto.Object
 
 type Job struct {
 	ObjectToWorkWith         *dlzamanagerproto.Object
 	RelevantStorageLocations *dlzamanagerproto.StorageLocations
 }
+
+var workerWaitingTime int
 
 func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
 	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, wg *sync.WaitGroup, logger zLogger.ZLogger) {
@@ -71,8 +70,8 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 			logger.Info().Msgf("Worker ID: %d finished to process object with ID: %s", id, obj.ObjectToWorkWith.Id)
 			delete(objectCash, obj.ObjectToWorkWith.Id)
 			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, len(objectCash))
-		case <-time.After(10 * time.Second):
-			logger.Info().Msgf("Timeout: no value received in 10 second. Worker ID: %d", id)
+		case <-time.After(time.Duration(workerWaitingTime) * time.Second):
+			logger.Debug().Msgf("Timeout: no value received in 10 second. Worker ID: %d", id)
 		}
 	}
 }
@@ -187,7 +186,8 @@ func main() {
 	var wg sync.WaitGroup
 	objectCash = make(map[string]*dlzamanagerproto.Object)
 	jobChan := make(chan Job)
-	for i := 0; i < amountOfWorker; i++ {
+	workerWaitingTime = conf.WorkerWaitingTime
+	for i := 0; i < conf.AmountOfWorkers; i++ {
 		wg.Add(1)
 		go worker(i, jobChan, clientDispatcherHandler, clientDispatcherStorageHandler, &wg, logger)
 	}
@@ -243,7 +243,8 @@ func main() {
 						continue
 					}
 					for {
-						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(), &dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), Interval: "'2' day"})
+						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(),
+							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), Interval: fmt.Sprintf("'%d' day", conf.DaysWithoutCheck)})
 						if err != nil {
 							logger.Error().Msgf("cannot GetObjectsByCollectionAlias %v", err)
 							break
@@ -253,10 +254,10 @@ func main() {
 						}
 						objectCash[object.Id] = object
 						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocations}}
-						if len(objectCash) == amountOfWorker {
+						if len(objectCash) == conf.AmountOfWorkers {
 							for {
-								time.Sleep(timeToWaiteWorker * time.Second)
-								if len(objectCash) < amountOfWorker {
+								time.Sleep(time.Duration(conf.TimeToWaitWorker) * time.Second)
+								if len(objectCash) < conf.AmountOfWorkers {
 									break
 								}
 							}
