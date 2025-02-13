@@ -55,13 +55,7 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 				logger.Info().Msgf("Data channel is closed. Worker ID: %d", id)
 				return
 			}
-			objectInstances, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(context.Background(), &dlzamanagerproto.Id{Id: obj.ObjectToWorkWith.Id})
-			if err != nil {
-				logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %v", obj.ObjectToWorkWith.Id, err)
-				delete(objectCash, obj.ObjectToWorkWith.Id)
-				continue
-			}
-			err = checkObjectInstancesDistributionAndReact(context.Background(), objectInstances, dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj.RelevantStorageLocations, logger)
+			err := checkObjectInstancesDistributionAndReact(context.Background(), dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
 			if err != nil {
 				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %v", obj.ObjectToWorkWith.Id, err)
 				delete(objectCash, obj.ObjectToWorkWith.Id)
@@ -293,10 +287,15 @@ func main() {
 	wg.Wait()
 }
 
-func checkObjectInstancesDistributionAndReact(ctx context.Context, objectInstances *dlzamanagerproto.ObjectInstances, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
-	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, relevantStorageLocations *dlzamanagerproto.StorageLocations, logger zLogger.ZLogger) error {
+func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
+	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, obj Job, logger zLogger.ZLogger) error {
 	objectInstancesChecked := make([]*dlzamanagerproto.ObjectInstance, 0)
 	storageLocationsAndObjectInstancesCurrent := make(map[*dlzamanagerproto.ObjectInstance]*dlzamanagerproto.StorageLocation)
+	objectInstances, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(context.Background(), &dlzamanagerproto.Id{Id: obj.ObjectToWorkWith.Id})
+	if err != nil {
+		logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %v", obj.ObjectToWorkWith.Id, err)
+		return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %v", obj.ObjectToWorkWith.Id)
+	}
 	var objectInstanceToCopyFrom *dlzamanagerproto.ObjectInstance
 	for index, objectInstanceIter := range objectInstances.ObjectInstances {
 		storageLocation, err := dispatcherHandlerServiceClient.GetStorageLocationByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
@@ -321,8 +320,8 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, objectInstanc
 		logger.Error().Msgf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].Id)
 		return errors.New(fmt.Sprintf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].Id))
 	}
-	storageLocationsToCopyTo := dlzaService.GetStorageLocationsToCopyTo(relevantStorageLocations, maps.Values(storageLocationsAndObjectInstancesCurrent))
-	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(relevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
+	storageLocationsToCopyTo := dlzaService.GetStorageLocationsToCopyTo(obj.RelevantStorageLocations, maps.Values(storageLocationsAndObjectInstancesCurrent))
+	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(obj.RelevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
 
 	for _, storageLocationToCopyTo := range storageLocationsToCopyTo {
 		_, err := dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{LocationCopyTo: storageLocationToCopyTo, ObjectInstance: objectInstanceToCopyFrom})
