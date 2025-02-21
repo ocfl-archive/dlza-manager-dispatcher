@@ -176,7 +176,6 @@ func main() {
 
 	resolver.DoPing(clientDispatcherStorageHandler, logger)
 
-	//dispatcherHandlerService := service.NewDispatcherHandlerService(clientDispatcherHandler, clientDispatcherStorageHandler, logger)
 	var wg sync.WaitGroup
 	objectCash = make(map[string]*dlzamanagerproto.Object)
 	jobChan := make(chan Job)
@@ -215,7 +214,6 @@ func main() {
 						logger.Error().Msgf("collection %v does not have enough storage locations to gain the quality needed", collection.Alias)
 						continue
 					}
-
 					storageLocationDistribution, err := clientDispatcherHandler.GetExistingStorageLocationsCombinationsForCollectionId(context.Background(), &dlzamanagerproto.Id{Id: collection.Id})
 					if err != nil {
 						logger.Error().Msgf("cannot GetExistingStorageLocationsCombinationsForCollectionId %s", err)
@@ -236,11 +234,15 @@ func main() {
 					if checkDoesNotNeeded {
 						continue
 					}
+					var relevantStorageLocationsIds []string
+					for _, relevantStorageLocation := range relevantStorageLocations {
+						relevantStorageLocationsIds = append(relevantStorageLocationsIds, relevantStorageLocation.Id)
+					}
 					for {
 						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(),
-							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), Interval: fmt.Sprintf("'%d' day", conf.DaysWithoutCheck)})
+							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), CollectionsIds: relevantStorageLocationsIds, Interval: fmt.Sprintf("'%d' day", conf.DaysWithoutCheck)})
 						if err != nil {
-							logger.Error().Msgf("cannot GetObjectsByCollectionAlias %v", err)
+							logger.Error().Msgf("cannot GetObjectsByCollectionAlias for collection: %s, %v", collection.Alias, err)
 							break
 						}
 						if object.Id == "" {
@@ -259,15 +261,6 @@ func main() {
 					}
 				}
 			}
-
-			///////////
-			/*
-				err = dispatcherHandlerService.GetLowQualityCollectionsAndAct()
-				if err != nil {
-					logger.Error().Msgf("error in GetLowQualityCollectionsAndAct method: %v", err)
-				}
-
-			*/
 			select {
 			case <-end:
 				return
@@ -298,6 +291,16 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 	}
 	var objectInstanceToCopyFrom *dlzamanagerproto.ObjectInstance
 	for index, objectInstanceIter := range objectInstances.ObjectInstances {
+		objectInstanceChecks, err := dispatcherHandlerServiceClient.GetObjectInstanceChecksByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
+		if err != nil {
+			logger.Error().Msgf("cannot GetObjectInstanceChecksByObjectInstanceId for object instance with path %v", objectInstanceIter.Path, err)
+			continue
+		}
+		if len(objectInstanceChecks.ObjectInstanceChecks) != 0 {
+			if objectInstanceChecks.ObjectInstanceChecks[0].Error {
+				return nil
+			}
+		}
 		storageLocation, err := dispatcherHandlerServiceClient.GetStorageLocationByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
 		if err != nil {
 			logger.Error().Msgf("cannot GetStorageLocationByObjectInstanceId for object instance with path %v", objectInstanceIter.Path, err)

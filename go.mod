@@ -7,13 +7,13 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/je4/filesystem/v2 v2.0.15
 	github.com/je4/utils/v2 v2.0.58
-	github.com/ocfl-archive/dlza-manager v1.0.0-beta2
-	github.com/ocfl-archive/dlza-manager-handler v1.0.0-beta2
+	github.com/ocfl-archive/dlza-manager v1.0.0-beta3
+	github.com/ocfl-archive/dlza-manager-handler v1.0.0-beta3
 	github.com/ocfl-archive/dlza-manager-storage-handler v1.0.0-beta2
 	gitlab.switch.ch/ub-unibas/go-ublogger/v2 v2.0.1
 	go.ub.unibas.ch/cloud/certloader/v2 v2.0.18
 	go.ub.unibas.ch/cloud/miniresolver/v2 v2.0.31
-	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac
+	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
 )
 
 require (
