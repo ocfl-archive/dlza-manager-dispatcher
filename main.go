@@ -260,7 +260,6 @@ func main() {
 						}
 					}
 				}
-				logger.Info().Msgf("All collections have enough of locations to meet the quality requirements", time.Now())
 			}
 			select {
 			case <-end:
