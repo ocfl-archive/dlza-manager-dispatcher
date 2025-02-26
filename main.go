@@ -344,33 +344,20 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 	if len(storageLocationsToCopyTo) != 0 {
 		objectInstancesNew, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(ctx, &dlzamanagerproto.Id{Id: objectInstances.ObjectInstances[0].ObjectId})
 		if err != nil {
-			logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %v", objectInstances.ObjectInstances[0].ObjectId, err)
-			return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %v", objectInstances.ObjectInstances[0].ObjectId)
+			logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %s", objectInstances.ObjectInstances[0].ObjectId, err)
+			return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %s", objectInstances.ObjectInstances[0].ObjectId)
 		}
 		objectInstances = objectInstancesNew
 	}
 	for _, objectInstance := range objectInstances.ObjectInstances {
 		if objectInstance.Status != deleteStatus && objectInstance.Status != notAvailable && objectInstance.Status != errorStatus {
 			objectInstance.Status = okStatus
-			err := updateInstanceAndCreateCheck(ctx, dispatcherHandlerServiceClient, objectInstance, false, "")
+			_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstance)
 			if err != nil {
-				logger.Error().Msgf("cannot updateInstanceAndCreateCheck for object with ID %v", objectInstance.ObjectId, err)
-				return errors.Wrapf(err, "cannot updateInstanceAndCreateCheck for object with ID %v", objectInstance.ObjectId)
+				logger.Error().Msgf("cannot UpdateObjectInstance for object with ID %s", objectInstance.ObjectId, err)
+				return errors.Wrapf(err, "cannot UpdateObjectInstance for object with ID %s", objectInstance.ObjectId)
 			}
 		}
-	}
-	return nil
-}
-
-func updateInstanceAndCreateCheck(ctx context.Context, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient, objectInstance *dlzamanagerproto.ObjectInstance, errorCheck bool, message string) error {
-	_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstance)
-	if err != nil {
-		return err
-	}
-	_, err = dispatcherHandlerServiceClient.CreateObjectInstanceCheck(ctx, &dlzamanagerproto.ObjectInstanceCheck{ObjectInstanceId: objectInstance.Id,
-		Error: errorCheck, Message: message})
-	if err != nil {
-		return err
 	}
 	return nil
 }
