@@ -65,7 +65,7 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 			delete(objectCash, obj.ObjectToWorkWith.Id)
 			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, len(objectCash))
 		case <-time.After(time.Duration(workerWaitingTime) * time.Second):
-			logger.Debug().Msgf("Timeout: no value received in 10 second. Worker ID: %d", id)
+			//logger.Debug().Msgf("Timeout: no value received in %d second. Worker ID: %d", workerWaitingTime, id)
 		}
 	}
 }
@@ -240,9 +240,9 @@ func main() {
 					}
 					for {
 						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(),
-							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), CollectionsIds: relevantStorageLocationsIds, Interval: fmt.Sprintf("'%d' day", conf.DaysWithoutCheck)})
+							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), CollectionsIds: relevantStorageLocationsIds})
 						if err != nil {
-							logger.Error().Msgf("cannot GetObjectsByCollectionAlias for collection: %s, %v", collection.Alias, err)
+							logger.Debug().Msgf("cannot GetObjectsByCollectionAlias for collection: %s, %v", collection.Alias, err)
 							break
 						}
 						if object.Id == "" {
@@ -260,6 +260,7 @@ func main() {
 						}
 					}
 				}
+				logger.Info().Msgf("All collections have enough of locations to meet the quality requirements", time.Now())
 			}
 			select {
 			case <-end:
@@ -350,7 +351,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 		objectInstances = objectInstancesNew
 	}
 	for _, objectInstance := range objectInstances.ObjectInstances {
-		if objectInstance.Status != deleteStatus {
+		if objectInstance.Status != deleteStatus && objectInstance.Status != notAvailable && objectInstance.Status != errorStatus {
 			objectInstance.Status = okStatus
 			err := updateInstanceAndCreateCheck(ctx, dispatcherHandlerServiceClient, objectInstance, false, "")
 			if err != nil {

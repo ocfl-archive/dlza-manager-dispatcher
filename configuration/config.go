@@ -34,7 +34,6 @@ type DispatcherConfig struct {
 	CollectionCacheTimeout  config.Duration       `toml:"collectioncachetimeout"`
 	CollectionCacheSize     int                   `toml:"collectioncachesize"`
 	ItemCacheSize           int                   `toml:"itemcachesize"`
-	DaysWithoutCheck        int                   `toml:"dayswithoutcheck"`
 	AmountOfWorkers         int                   `toml:"amountofworkers"`
 	TimeToWaitWorker        int                   `toml:"timetowaitworker"`
 	WorkerWaitingTime       int                   `toml:"workerwaitingtime"`
