@@ -37,7 +37,7 @@ dnss = []
 uris = ["grpc:ubdlza.handlerproto.DispatcherHandlerService","grpc:ubdlza.storagehandlerproto.DispatcherStorageHandlerService", "grpc:miniresolverproto.MiniResolver"]
 ips = []
 certinterval = "24h"
-certttl = "2h"
+certttl = "48h"
 ca = ["certs/minivault.ca.pem"]
 usesystempool = false
 
