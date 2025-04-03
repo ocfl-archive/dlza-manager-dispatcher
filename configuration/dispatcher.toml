@@ -11,7 +11,7 @@ iiif = "http://localhost:8182/iiif"
 iiifprefix = "vfs://testcache/ub-media-testbucket-02/"
 iiifbaseaction = "convert/formatptif/tile512x512/compressjpeg/quality75"
 cyclelength = 600
-amountofworkers = 1
+amountofworkers = 10
 timetowaitworker = 5
 workerwaitingtime = 1
 
