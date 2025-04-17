@@ -34,6 +34,7 @@ const (
 	okStatus     = "ok"
 	deleteStatus = "to delete"
 	notAvailable = "not available"
+	deprecated   = "deprecated"
 )
 
 var objectCash map[string]*dlzamanagerproto.Object
@@ -327,11 +328,11 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 			logger.Error().Msgf("cannot GetStorageLocationByObjectInstanceId for object instance with path %v", objectInstanceIter.Path, err)
 			return errors.Wrapf(err, "cannot GetStorageLocationByObjectInstanceId for object instance with path %v", objectInstanceIter.Path)
 		}
-		if objectInstanceIter.Status != deleteStatus {
+		if objectInstanceIter.Status != deleteStatus && objectInstanceIter.Status != deprecated {
 			storageLocationsAndObjectInstancesCurrent[objectInstanceIter] = storageLocation
 		}
 		if objectInstanceIter.Status != errorStatus && objectInstanceIter.Status != notAvailable &&
-			objectInstanceIter.Status != deleteStatus {
+			objectInstanceIter.Status != deleteStatus && objectInstanceIter.Status != deprecated {
 			objectInstancesChecked = append(objectInstancesChecked, objectInstanceIter)
 			if storageLocation.FillFirst {
 				objectInstanceToCopyFrom = objectInstanceIter
@@ -377,7 +378,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 		objectInstances = objectInstancesNew
 	}
 	for _, objectInstance := range objectInstances.ObjectInstances {
-		if objectInstance.Status != deleteStatus && objectInstance.Status != notAvailable && objectInstance.Status != errorStatus {
+		if objectInstance.Status != deleteStatus && objectInstance.Status != notAvailable && objectInstance.Status != errorStatus && objectInstance.Status != deprecated {
 			objectInstance.Status = okStatus
 			_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstance)
 			if err != nil {
