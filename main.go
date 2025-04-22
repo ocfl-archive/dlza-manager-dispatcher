@@ -43,10 +43,10 @@ type partitionMutex struct {
 	mutex sync.Mutex
 }
 
-func (p *partitionMutex) incPartition(ctx context.Context, objectInstance *dlzamanagerproto.ObjectInstance, storageLocation *dlzamanagerproto.StorageLocation, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient) (*dlzamanagerproto.StoragePartition, error) {
+func (p *partitionMutex) incPartition(ctx context.Context, objectInstance *dlzamanagerproto.ObjectInstance, storageLocation *dlzamanagerproto.StorageLocation, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient, obj Job) (*dlzamanagerproto.StoragePartition, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstance.Size, Id: storageLocation.Id})
+	storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstance.Size, Id: storageLocation.Id, Object: obj.ObjectToWorkWith})
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot get storagePartition for storageLocation: %v", storageLocation.Alias)
 	}
@@ -350,7 +350,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 
 	for _, storageLocationToCopyTo := range storageLocationsToCopyTo {
 
-		storagePartition, err := mutexStruct.incPartition(ctx, objectInstanceToCopyFrom, storageLocationToCopyTo, dispatcherHandlerServiceClient)
+		storagePartition, err := mutexStruct.incPartition(ctx, objectInstanceToCopyFrom, storageLocationToCopyTo, dispatcherHandlerServiceClient, obj)
 		if err != nil {
 			logger.Error().Msgf("cannot incPartition for storage location %v", storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot incPartition for  storage location %v", storageLocationToCopyTo.Alias)
