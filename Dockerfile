@@ -1,4 +1,4 @@
-FROM golang:1.23.2 as builder
+FROM golang:1.24.1 as builder
 
 WORKDIR /dlza-manager-dispatcher
 

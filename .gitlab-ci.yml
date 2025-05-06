@@ -39,3 +39,4 @@ build-develop-image:
   only:             
     - develop
     - dev_png
+    - dismantling-uploader

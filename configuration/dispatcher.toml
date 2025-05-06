@@ -1,0 +1,107 @@
+localaddr = ":8761"
+domain = "ubdlza"
+resolveraddr = "[::1]:7777"
+resolvertimeout = "10m"
+resolvernotfoundtimeout = "10s"
+externaladdr = "https://localhost:8761"
+loglevel = "DEBUG"
+jwtkey = "geheim"
+jwtalg = ["HS256","HS384","HS512"]
+iiif = "http://localhost:8182/iiif"
+iiifprefix = "vfs://testcache/ub-media-testbucket-02/"
+iiifbaseaction = "convert/formatptif/tile512x512/compressjpeg/quality75"
+cyclelength = 600
+amountofworkers = 10
+timetowaitworker = 5
+workerwaitingtime = 1
+
+ActionTemplateTimeout = "10s"
+
+#iiifbaseaction = "convert/formatjp2/"
+
+#[grpcclient]
+#mediaserverdb = "localhost:7653"
+
+[client]
+type = "minivault"
+initialtimeout = "1h"
+[client.minivault]
+baseurl = "https://localhost:8759/api/v1"
+parenttoken = "pa.220f5d92c3f2b457.11ac66027d4d8d97"
+tokentype = "client_cert"
+tokenpolicies = ["ubdlza.dispatcher"]
+tokeninterval = "48h"
+tokenttl = "96h"
+certtype = "client_cert"
+dnss = []
+uris = ["grpc:ubdlza.handlerproto.DispatcherHandlerService","grpc:ubdlza.storagehandlerproto.DispatcherStorageHandlerService", "grpc:miniresolverproto.MiniResolver"]
+ips = []
+certinterval = "24h"
+certttl = "48h"
+ca = ["certs/minivault.ca.pem"]
+usesystempool = false
+
+
+[vfs.drivec]
+name = "drivec"
+type = "os"
+[vfs.drivec.os]
+basedir = "C:/Users/micro/Downloads"
+
+[vfs.test]
+name = "test"
+type = "sftp"
+[vfs.test.sftp]
+address = "ub-x2go4.ub.p.unibas.ch:22"
+user = "jumpuser"
+privatekey = ["C:/daten/keys/syncthing/putty_ed25519.priv.openssh"]
+basedir = "/digispace"
+sessions = 3
+zipasfoldercache = 2
+
+[vfs.tests3]
+name = "tests3"
+type = "S3"
+[vfs.tests3.S3]
+AccessKeyID = "009145048a6e9c39de76"
+SecretAccessKey = "%%TESTSECRET%%"
+Endpoint = "s3-zh.lts.switch.ch"
+Region = "zurich"
+UseSSL = true
+Debug = false
+CAPEM = "ignore"
+BaseUrl = ""
+ZipAsFolderCache = 0
+
+[vfs.testcache]
+name = "testcache"
+type = "S3"
+[vfs.testcache.S3]
+AccessKeyID = "AKIA312912CB2F7328D3"
+SecretAccessKey = "%%TESTCACHESECRET%%"
+Endpoint = "vip-ecs-ub.storage.p.unibas.ch"
+Region = ""
+UseSSL = true
+Debug = false
+BaseUrl = ""
+ZipAsFolderCache = 0
+CAPEM = "ignore"
+
+[log]
+level = "debug"
+
+[log.stash]
+#logstash_host="sb-uwf4.swissbib.unibas.ch"
+logstashhost="localhost"
+logstashport=5046
+logstashtracelevel="ERROR"
+namespace="dispatcher"
+dataset=""
+#dataset="logs-dlza"
+[log.stash.tls]
+type="file"
+ca=["certs/ca.crt"]
+interval="1h"
+[log.stash.tls.file]
+cert="certs/ub-log.ub.unibas.ch.cert.pem"
+key="certs/ub-log.ub.unibas.ch.key.pem"
