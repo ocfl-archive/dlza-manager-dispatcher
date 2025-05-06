@@ -35,6 +35,7 @@ const (
 	deleteStatus = "to delete"
 	notAvailable = "not available"
 	deprecated   = "deprecated"
+	newStatus    = "new"
 )
 
 var objectCash map[string]*dlzamanagerproto.Object
