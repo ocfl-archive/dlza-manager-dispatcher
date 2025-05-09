@@ -185,8 +185,6 @@ func main() {
 		logger.Panic().Msgf("cannot create clientDispatcherHandler grpc client: %v", err)
 	}
 
-	resolver.DoPing(clientDispatcherHandler, logger)
-
 	//////DispatcherStorageHandler gRPC connection
 
 	clientDispatcherStorageHandler, err := resolver.NewClient[storageHandlerClientProto.DispatcherStorageHandlerServiceClient](
@@ -197,7 +195,6 @@ func main() {
 		logger.Panic().Msgf("cannot create clientDispatcherStorageHandler grpc client: %v", err)
 	}
 
-	resolver.DoPing(clientDispatcherStorageHandler, logger)
 	mutex := &partitionMutex{}
 	var wg sync.WaitGroup
 	objectCash = make(map[string]*dlzamanagerproto.Object)
