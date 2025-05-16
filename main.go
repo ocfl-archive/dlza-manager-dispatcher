@@ -364,5 +364,23 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 			return errors.Wrapf(err, "cannot UpdateObjectInstance with ID %s", objectInstanceToDelete.Id)
 		}
 	}
+	if len(storageLocationsToCopyTo) != 0 {
+		objectInstancesNew, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(ctx, &dlzamanagerproto.Id{Id: objectInstances.ObjectInstances[0].ObjectId})
+		if err != nil {
+			logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %s, err %v", objectInstances.ObjectInstances[0].ObjectId, err)
+			return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %s", objectInstances.ObjectInstances[0].ObjectId)
+		}
+		objectInstances = objectInstancesNew
+	}
+	for _, objectInstance := range objectInstances.ObjectInstances {
+		if objectInstance.Status == notAvailable || objectInstance.Status == errorStatus || objectInstance.Status == deprecated {
+			objectInstance.Status = deleteStatus
+			_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstance)
+			if err != nil {
+				logger.Error().Msgf("cannot UpdateObjectInstance for object with ID %s, err %v", objectInstance.ObjectId, err)
+				return errors.Wrapf(err, "cannot UpdateObjectInstance for object with ID %s", objectInstance.ObjectId)
+			}
+		}
+	}
 	return nil
 }
