@@ -80,7 +80,7 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 			}
 			err := checkObjectInstancesDistributionAndReact(context.Background(), mutexStruct, dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
 			if err != nil {
-				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %v", obj.ObjectToWorkWith.Id, err)
+				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
 				delete(objectCash, obj.ObjectToWorkWith.Id)
 				continue
 			}
@@ -306,31 +306,28 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 	storageLocationsAndObjectInstancesCurrent := make(map[*dlzamanagerproto.ObjectInstance]*dlzamanagerproto.StorageLocation)
 	objectInstances, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(context.Background(), &dlzamanagerproto.Id{Id: obj.ObjectToWorkWith.Id})
 	if err != nil {
-		logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %v", obj.ObjectToWorkWith.Id, err)
-		return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %v", obj.ObjectToWorkWith.Id)
+		logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
+		return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %s", obj.ObjectToWorkWith.Id)
 	}
 	var objectInstanceToCopyFrom *dlzamanagerproto.ObjectInstance
 	for index, objectInstanceIter := range objectInstances.ObjectInstances {
 		objectInstanceChecks, err := dispatcherHandlerServiceClient.GetObjectInstanceChecksByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
 		if err != nil {
-			logger.Error().Msgf("cannot GetObjectInstanceChecksByObjectInstanceId for object instance with path %v", objectInstanceIter.Path, err)
+			logger.Error().Msgf("cannot GetObjectInstanceChecksByObjectInstanceId for object instance with path %s, err: %v", objectInstanceIter.Path, err)
 			continue
 		}
 		if len(objectInstanceChecks.ObjectInstanceChecks) != 0 {
 			if objectInstanceChecks.ObjectInstanceChecks[0].Error {
-				return nil
+				continue
 			}
 		}
 		storageLocation, err := dispatcherHandlerServiceClient.GetStorageLocationByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
 		if err != nil {
-			logger.Error().Msgf("cannot GetStorageLocationByObjectInstanceId for object instance with path %v", objectInstanceIter.Path, err)
-			return errors.Wrapf(err, "cannot GetStorageLocationByObjectInstanceId for object instance with path %v", objectInstanceIter.Path)
+			logger.Error().Msgf("cannot GetStorageLocationByObjectInstanceId for object instance with path %s, err: %v", objectInstanceIter.Path, err)
+			return errors.Wrapf(err, "cannot GetStorageLocationByObjectInstanceId for object instance with path %s", objectInstanceIter.Path)
 		}
-		if objectInstanceIter.Status != deleteStatus && objectInstanceIter.Status != deprecated {
+		if objectInstanceIter.Status == okStatus || objectInstanceIter.Status == newStatus {
 			storageLocationsAndObjectInstancesCurrent[objectInstanceIter] = storageLocation
-		}
-		if objectInstanceIter.Status != errorStatus && objectInstanceIter.Status != notAvailable &&
-			objectInstanceIter.Status != deleteStatus && objectInstanceIter.Status != deprecated {
 			objectInstancesChecked = append(objectInstancesChecked, objectInstanceIter)
 			if storageLocation.FillFirst {
 				objectInstanceToCopyFrom = objectInstanceIter
@@ -350,39 +347,21 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 
 		storagePartition, err := mutexStruct.incPartition(ctx, objectInstanceToCopyFrom, storageLocationToCopyTo, dispatcherHandlerServiceClient, obj)
 		if err != nil {
-			logger.Error().Msgf("cannot incPartition for storage location %v", storageLocationToCopyTo.Alias, err)
-			return errors.Wrapf(err, "cannot incPartition for  storage location %v", storageLocationToCopyTo.Alias)
+			logger.Error().Msgf("cannot incPartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
+			return errors.Wrapf(err, "cannot incPartition for  storage location %s", storageLocationToCopyTo.Alias)
 		}
 		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{LocationCopyTo: storageLocationToCopyTo, ObjectInstance: objectInstanceToCopyFrom, StoragePartition: storagePartition})
 		if err != nil {
-			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %v to storage location %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias, err)
-			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %v to storage location %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias)
+			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %s to storage location %s, err: %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias, err)
+			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %s to storage location %s", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias)
 		}
 	}
-	for objectInstanceToDelete, _ := range storageLocationsToDeleteFromWithObjectInstances {
+	for objectInstanceToDelete := range storageLocationsToDeleteFromWithObjectInstances {
 		objectInstanceToDelete.Status = deleteStatus
 		_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstanceToDelete)
 		if err != nil {
-			logger.Error().Msgf("cannot UpdateObjectInstance with ID", objectInstanceToDelete.Id, err)
-			return errors.Wrapf(err, "cannot UpdateObjectInstance with ID", objectInstanceToDelete.Id)
-		}
-	}
-	if len(storageLocationsToCopyTo) != 0 {
-		objectInstancesNew, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(ctx, &dlzamanagerproto.Id{Id: objectInstances.ObjectInstances[0].ObjectId})
-		if err != nil {
-			logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %s", objectInstances.ObjectInstances[0].ObjectId, err)
-			return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %s", objectInstances.ObjectInstances[0].ObjectId)
-		}
-		objectInstances = objectInstancesNew
-	}
-	for _, objectInstance := range objectInstances.ObjectInstances {
-		if objectInstance.Status != deleteStatus && objectInstance.Status != notAvailable && objectInstance.Status != errorStatus && objectInstance.Status != deprecated {
-			objectInstance.Status = okStatus
-			_, err := dispatcherHandlerServiceClient.UpdateObjectInstance(ctx, objectInstance)
-			if err != nil {
-				logger.Error().Msgf("cannot UpdateObjectInstance for object with ID %s", objectInstance.ObjectId, err)
-				return errors.Wrapf(err, "cannot UpdateObjectInstance for object with ID %s", objectInstance.ObjectId)
-			}
+			logger.Error().Msgf("cannot UpdateObjectInstance with ID %s, err: %v ", objectInstanceToDelete.Id, err)
+			return errors.Wrapf(err, "cannot UpdateObjectInstance with ID %s", objectInstanceToDelete.Id)
 		}
 	}
 	return nil
