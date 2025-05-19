@@ -254,6 +254,7 @@ func main() {
 					if checkDoesNotNeeded {
 						continue
 					}
+					logger.Debug().Msgf("collection with alias %s should be checked for quality", collection.Alias)
 					var relevantStorageLocationsIds []string
 					for _, relevantStorageLocation := range relevantStorageLocations {
 						relevantStorageLocationsIds = append(relevantStorageLocationsIds, relevantStorageLocation.Id)
@@ -266,6 +267,7 @@ func main() {
 							break
 						}
 						if object.Id == "" {
+							logger.Debug().Msgf("All objects from collection with alias %s are archived with quality needed", collection.Alias)
 							break
 						}
 						objectCash[object.Id] = object
@@ -285,6 +287,7 @@ func main() {
 			case <-end:
 				return
 			case <-time.After(time.Duration(conf.CycleLength) * time.Second):
+				logger.Debug().Msgf("Cycle with length %d seconds finished. Ammount of workers: %d", conf.CycleLength, conf.AmountOfWorkers)
 			}
 
 		}
