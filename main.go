@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"emperror.dev/errors"
+	"encoding/json"
 	"flag"
 	"fmt"
 	configutil "github.com/je4/utils/v2/pkg/config"
@@ -12,6 +13,7 @@ import (
 	handlerClientProto "github.com/ocfl-archive/dlza-manager-handler/handlerproto"
 	storageHandlerClientProto "github.com/ocfl-archive/dlza-manager-storage-handler/storagehandlerproto"
 	"github.com/ocfl-archive/dlza-manager/dlzamanagerproto"
+	"github.com/ocfl-archive/dlza-manager/models"
 	dlzaService "github.com/ocfl-archive/dlza-manager/service"
 	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger/v2"
 	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
@@ -213,30 +215,30 @@ func main() {
 
 			tenants, err := clientDispatcherHandler.FindAllTenants(context.Background(), &dlzamanagerproto.NoParam{})
 			if err != nil {
-				logger.Error().Msgf("cannot FindAllTenants %s", err)
+				logger.Error().Msgf("cannot FindAllTenants %v", err)
 			}
 			for _, tenant := range tenants.Tenants {
 
 				collections, err := clientDispatcherHandler.GetCollectionsByTenantId(context.Background(), &dlzamanagerproto.Id{Id: tenant.Id})
 				if err != nil {
-					logger.Error().Msgf("cannot GetCollectionsByTenantId %s", err)
+					logger.Error().Msgf("cannot GetCollectionsByTenantId %v", err)
 					continue
 				}
 				storageLocationsPb, err := clientDispatcherHandler.GetStorageLocationsByTenantId(context.Background(), &dlzamanagerproto.Id{Id: tenant.Id})
 				if err != nil {
-					logger.Error().Msgf("cannot GetStorageLocationsByTenantId %s", err)
+					logger.Error().Msgf("cannot GetStorageLocationsByTenantId %v", err)
 					continue
 				}
 				for _, collection := range collections.Collections {
 
 					relevantStorageLocations := dlzaService.GetCheapestStorageLocationsForQuality(storageLocationsPb, int(collection.Quality))
 					if len(relevantStorageLocations) == 0 {
-						logger.Error().Msgf("collection %v does not have enough storage locations to gain the quality needed", collection.Alias)
+						logger.Error().Msgf("collection %s does not have enough storage locations to gain the quality needed", collection.Alias)
 						continue
 					}
 					storageLocationDistribution, err := clientDispatcherHandler.GetExistingStorageLocationsCombinationsForCollectionId(context.Background(), &dlzamanagerproto.Id{Id: collection.Id})
 					if err != nil {
-						logger.Error().Msgf("cannot GetExistingStorageLocationsCombinationsForCollectionId %s", err)
+						logger.Error().Msgf("cannot GetExistingStorageLocationsCombinationsForCollectionId %v", err)
 						continue
 					}
 					checkDoesNotNeeded := false
@@ -353,7 +355,22 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 			logger.Error().Msgf("cannot incPartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot incPartition for  storage location %s", storageLocationToCopyTo.Alias)
 		}
-		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{LocationCopyTo: storageLocationToCopyTo, ObjectInstance: objectInstanceToCopyFrom, StoragePartition: storagePartition})
+		connection := models.Connection{}
+		err = json.Unmarshal([]byte(storageLocationToCopyTo.Connection), &connection)
+		if err != nil {
+			logger.Error().Msgf("error mapping json")
+			return errors.Wrapf(err, "error mapping json for storageLocation: %s", storageLocationToCopyTo.Alias)
+		}
+
+		path := connection.Folder + storagePartition.Alias + "/" + filepath.Base(objectInstanceToCopyFrom.Path)
+		objectInstance := &dlzamanagerproto.ObjectInstance{Path: path, Status: "new", ObjectId: objectInstanceToCopyFrom.ObjectId, StoragePartitionId: storagePartition.Id, Size: objectInstanceToCopyFrom.Size}
+		_, err = dispatcherHandlerServiceClient.CreateObjectInstance(ctx, objectInstance)
+		if err != nil {
+			logger.Error().Msgf("Could not create objectInstance for object with ID: %s. err: %v", objectInstanceToCopyFrom.ObjectId, err)
+			return errors.Wrapf(err, "Could not create objectInstance for object with ID: %s", objectInstanceToCopyFrom.ObjectId)
+		}
+
+		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{CopyTo: path, CopyFrom: objectInstanceToCopyFrom.Path})
 		if err != nil {
 			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %s to storage location %s, err: %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %s to storage location %s", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias)
