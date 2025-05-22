@@ -408,8 +408,8 @@ github.com/ocfl-archive/dlza-manager v1.0.1 h1:nSpiFWgxR64Ch6CYIsN7lUoGXyQwVfun3
 github.com/ocfl-archive/dlza-manager v1.0.1/go.mod h1:rjotQW2TAOBDs7bJZGDoBAiaDHamBxifdaIFTMiP5Rg=
 github.com/ocfl-archive/dlza-manager-handler v1.0.1 h1:yRwOkKBuOsYLSwHv+2Yobw7WjOjNokpVmjn6czs7V7Q=
 github.com/ocfl-archive/dlza-manager-handler v1.0.1/go.mod h1:rDF3HClRzKAOlNMdywwMb/PPhGraH+7y205tQ9/L1a8=
-github.com/ocfl-archive/dlza-manager-storage-handler v1.0.1 h1:G98g6SxLT/zCVVNcerUHe+7tsPvShzuR193BESTicWA=
-github.com/ocfl-archive/dlza-manager-storage-handler v1.0.1/go.mod h1:Bx579OFN/DSWF9yea21H0mbop95km6CoUQIkZQjkgug=
+github.com/ocfl-archive/dlza-manager-storage-handler v1.0.2 h1:DqJKwuF18oBnOjsgNCAMZjvL0U28E/Y2FcfpBYubSAI=
+github.com/ocfl-archive/dlza-manager-storage-handler v1.0.2/go.mod h1:Bx579OFN/DSWF9yea21H0mbop95km6CoUQIkZQjkgug=
 github.com/oklog/ulid v1.3.1 h1:EGfNDEx6MqHz8B3uNV6QAib1UR2Lm97sHi3ocA6ESJ4=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=

@@ -19,6 +19,7 @@ import (
 	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
 	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
 	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"io/fs"
 	"log"
@@ -196,6 +197,11 @@ func main() {
 	if err != nil {
 		logger.Panic().Msgf("cannot create clientDispatcherStorageHandler grpc client: %v", err)
 	}
+	msg, err := clientDispatcherStorageHandler.ConnectionCheck(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		logger.Panic().Msgf("Storage Handler connection check was unsuccsessful: %v", err)
+	}
+	logger.Info().Msg(msg.Id)
 
 	mutex := &partitionMutex{}
 	var wg sync.WaitGroup
