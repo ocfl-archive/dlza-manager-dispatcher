@@ -8,7 +8,7 @@ require (
 	github.com/je4/filesystem/v2 v2.0.15
 	github.com/je4/utils/v2 v2.0.60
 	github.com/ocfl-archive/dlza-manager v1.0.1
-	github.com/ocfl-archive/dlza-manager-handler v1.0.1
+	github.com/ocfl-archive/dlza-manager-handler v1.0.2
 	github.com/ocfl-archive/dlza-manager-storage-handler v1.0.2
 	gitlab.switch.ch/ub-unibas/go-ublogger/v2 v2.0.2-0.20250331093945-4f0f0ce8c72d
 	go.ub.unibas.ch/cloud/certloader/v2 v2.0.18
@@ -86,7 +86,7 @@ require (
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250512202823-5a2f75b736a9 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
+	google.golang.org/grpc v1.72.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )

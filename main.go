@@ -315,41 +315,32 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, obj Job, logger zLogger.ZLogger) error {
 	objectInstancesChecked := make([]*dlzamanagerproto.ObjectInstance, 0)
 	storageLocationsAndObjectInstancesCurrent := make(map[*dlzamanagerproto.ObjectInstance]*dlzamanagerproto.StorageLocation)
-	objectInstances, err := dispatcherHandlerServiceClient.GetObjectsInstancesByObjectId(context.Background(), &dlzamanagerproto.Id{Id: obj.ObjectToWorkWith.Id})
+	objectInstances, err := dispatcherHandlerServiceClient.GetObjectInstancesByObjectIdPositive(context.Background(), &dlzamanagerproto.Id{Id: obj.ObjectToWorkWith.Id})
 	if err != nil {
-		logger.Error().Msgf("cannot GetObjectsInstancesByObjectId for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
-		return errors.Wrapf(err, "cannot GetObjectsInstancesByObjectId for object with ID %s", obj.ObjectToWorkWith.Id)
+		logger.Error().Msgf("cannot GetObjectInstancesByObjectIdPositive for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
+		return errors.Wrapf(err, "cannot GetObjectInstancesByObjectIdPositive for object with ID %s", obj.ObjectToWorkWith.Id)
 	}
 	var objectInstanceToCopyFrom *dlzamanagerproto.ObjectInstance
 	for index, objectInstanceIter := range objectInstances.ObjectInstances {
-		objectInstanceChecks, err := dispatcherHandlerServiceClient.GetObjectInstanceChecksByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
-		if err != nil {
-			logger.Error().Msgf("cannot GetObjectInstanceChecksByObjectInstanceId for object instance with path %s, err: %v", objectInstanceIter.Path, err)
-			continue
-		}
-		if len(objectInstanceChecks.ObjectInstanceChecks) != 0 {
-			if objectInstanceChecks.ObjectInstanceChecks[0].Error {
-				continue
-			}
-		}
 		storageLocation, err := dispatcherHandlerServiceClient.GetStorageLocationByObjectInstanceId(ctx, &dlzamanagerproto.Id{Id: objectInstanceIter.Id})
 		if err != nil {
 			logger.Error().Msgf("cannot GetStorageLocationByObjectInstanceId for object instance with path %s, err: %v", objectInstanceIter.Path, err)
 			return errors.Wrapf(err, "cannot GetStorageLocationByObjectInstanceId for object instance with path %s", objectInstanceIter.Path)
 		}
-		if objectInstanceIter.Status == okStatus || objectInstanceIter.Status == newStatus {
-			storageLocationsAndObjectInstancesCurrent[objectInstanceIter] = storageLocation
-			objectInstancesChecked = append(objectInstancesChecked, objectInstanceIter)
-			if storageLocation.FillFirst {
-				objectInstanceToCopyFrom = objectInstanceIter
-			} else if index == len(objectInstances.ObjectInstances)-1 && objectInstanceToCopyFrom == nil && len(objectInstancesChecked) != 0 {
-				objectInstanceToCopyFrom = objectInstancesChecked[0]
-			}
+		storageLocationsAndObjectInstancesCurrent[objectInstanceIter] = storageLocation
+		objectInstancesChecked = append(objectInstancesChecked, objectInstanceIter)
+		if storageLocation.FillFirst {
+			objectInstanceToCopyFrom = objectInstanceIter
+		} else if index == len(objectInstances.ObjectInstances)-1 && objectInstanceToCopyFrom == nil && len(objectInstancesChecked) != 0 {
+			objectInstanceToCopyFrom = objectInstancesChecked[0]
 		}
 	}
 	if len(objectInstancesChecked) == 0 {
-		logger.Error().Msgf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].Id)
-		return errors.New(fmt.Sprintf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].Id))
+		logger.Error().Msgf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].ObjectId)
+		return errors.New(fmt.Sprintf("There is no any object instance to copy from for object with ID %v", objectInstances.ObjectInstances[0].ObjectId))
+	}
+	if objectInstanceToCopyFrom == nil {
+		objectInstanceToCopyFrom = objectInstancesChecked[0]
 	}
 	storageLocationsToCopyTo := dlzaService.GetStorageLocationsToCopyTo(obj.RelevantStorageLocations, maps.Values(storageLocationsAndObjectInstancesCurrent))
 	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(obj.RelevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
@@ -369,7 +360,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 		}
 
 		path := connection.Folder + storagePartition.Alias + "/" + filepath.Base(objectInstanceToCopyFrom.Path)
-		objectInstance := &dlzamanagerproto.ObjectInstance{Path: path, Status: "new", ObjectId: objectInstanceToCopyFrom.ObjectId, StoragePartitionId: storagePartition.Id, Size: objectInstanceToCopyFrom.Size}
+		objectInstance := &dlzamanagerproto.ObjectInstance{Path: path, Status: "ok", ObjectId: objectInstanceToCopyFrom.ObjectId, StoragePartitionId: storagePartition.Id, Size: objectInstanceToCopyFrom.Size}
 		_, err = dispatcherHandlerServiceClient.CreateObjectInstance(ctx, objectInstance)
 		if err != nil {
 			logger.Error().Msgf("Could not create objectInstance for object with ID: %s. err: %v", objectInstanceToCopyFrom.ObjectId, err)
