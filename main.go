@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -43,27 +44,6 @@ const (
 
 var objectCash map[string]*dlzamanagerproto.Object
 
-type partitionMutex struct {
-	mutex sync.Mutex
-}
-
-func (p *partitionMutex) incPartition(ctx context.Context, objectInstance *dlzamanagerproto.ObjectInstance, storageLocation *dlzamanagerproto.StorageLocation, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient, obj Job) (*dlzamanagerproto.StoragePartition, error) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstance.Size, Id: storageLocation.Id, Object: obj.ObjectToWorkWith})
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get storagePartition for storageLocation: %v", storageLocation.Alias)
-	}
-	storagePartition.CurrentSize += objectInstance.Size
-	storagePartition.CurrentObjects++
-
-	_, err = dispatcherHandlerServiceClient.UpdateStoragePartition(ctx, storagePartition)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Could not update storage partition with ID: %v", storagePartition.Id)
-	}
-	return storagePartition, nil
-}
-
 type Job struct {
 	ObjectToWorkWith         *dlzamanagerproto.Object
 	RelevantStorageLocations *dlzamanagerproto.StorageLocations
@@ -72,7 +52,7 @@ type Job struct {
 var workerWaitingTime int
 
 func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
-	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, wg *sync.WaitGroup, mutexStruct *partitionMutex, logger zLogger.ZLogger) {
+	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, wg *sync.WaitGroup, logger zLogger.ZLogger) {
 	defer wg.Done()
 	for {
 		select {
@@ -81,7 +61,7 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 				logger.Info().Msgf("Data channel is closed. Worker ID: %d", id)
 				return
 			}
-			err := checkObjectInstancesDistributionAndReact(context.Background(), mutexStruct, dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
+			err := checkObjectInstancesDistributionAndReact(context.Background(), dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
 			if err != nil {
 				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
 				delete(objectCash, obj.ObjectToWorkWith.Id)
@@ -202,15 +182,13 @@ func main() {
 		logger.Panic().Msgf("Storage Handler connection check was unsuccsessful: %v", err)
 	}
 	logger.Info().Msg(msg.Id)
-
-	mutex := &partitionMutex{}
 	var wg sync.WaitGroup
 	objectCash = make(map[string]*dlzamanagerproto.Object)
 	jobChan := make(chan Job)
 	workerWaitingTime = conf.WorkerWaitingTime
 	for i := 0; i < conf.AmountOfWorkers; i++ {
 		wg.Add(1)
-		go worker(i, jobChan, clientDispatcherHandler, clientDispatcherStorageHandler, &wg, mutex, logger)
+		go worker(i, jobChan, clientDispatcherHandler, clientDispatcherStorageHandler, &wg, logger)
 	}
 
 	var end = make(chan struct{}, 1)
@@ -311,7 +289,7 @@ func main() {
 	wg.Wait()
 }
 
-func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *partitionMutex, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
+func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHandlerServiceClient handlerClientProto.DispatcherHandlerServiceClient,
 	dispatcherStorageHandlerServiceClient storageHandlerClientProto.DispatcherStorageHandlerServiceClient, obj Job, logger zLogger.ZLogger) error {
 	objectInstancesChecked := make([]*dlzamanagerproto.ObjectInstance, 0)
 	storageLocationsAndObjectInstancesCurrent := make(map[*dlzamanagerproto.ObjectInstance]*dlzamanagerproto.StorageLocation)
@@ -346,12 +324,12 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(obj.RelevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
 
 	for _, storageLocationToCopyTo := range storageLocationsToCopyTo {
-
-		storagePartition, err := mutexStruct.incPartition(ctx, objectInstanceToCopyFrom, storageLocationToCopyTo, dispatcherHandlerServiceClient, obj)
+		storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstanceToCopyFrom.Size, Id: storageLocationToCopyTo.Id, Object: obj.ObjectToWorkWith})
 		if err != nil {
-			logger.Error().Msgf("cannot incPartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
-			return errors.Wrapf(err, "cannot incPartition for  storage location %s", storageLocationToCopyTo.Alias)
+			logger.Error().Msgf("cannot get storagePartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
+			return errors.Wrapf(err, "cannot get storagePartition for storage location %s", storageLocationToCopyTo.Alias)
 		}
+
 		connection := models.Connection{}
 		err = json.Unmarshal([]byte(storageLocationToCopyTo.Connection), &connection)
 		if err != nil {
@@ -359,15 +337,15 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, mutexStruct *
 			return errors.Wrapf(err, "error mapping json for storageLocation: %s", storageLocationToCopyTo.Alias)
 		}
 
-		path := connection.Folder + storagePartition.Alias + "/" + filepath.Base(objectInstanceToCopyFrom.Path)
-		objectInstance := &dlzamanagerproto.ObjectInstance{Path: path, Status: "ok", ObjectId: objectInstanceToCopyFrom.ObjectId, StoragePartitionId: storagePartition.Id, Size: objectInstanceToCopyFrom.Size}
+		pathString := path.Join(connection.Folder, storagePartition.Alias, filepath.Base(objectInstanceToCopyFrom.Path))
+		objectInstance := &dlzamanagerproto.ObjectInstance{Path: pathString, Status: "ok", ObjectId: objectInstanceToCopyFrom.ObjectId, StoragePartitionId: storagePartition.Id, Size: objectInstanceToCopyFrom.Size}
 		_, err = dispatcherHandlerServiceClient.CreateObjectInstance(ctx, objectInstance)
 		if err != nil {
 			logger.Error().Msgf("Could not create objectInstance for object with ID: %s. err: %v", objectInstanceToCopyFrom.ObjectId, err)
 			return errors.Wrapf(err, "Could not create objectInstance for object with ID: %s", objectInstanceToCopyFrom.ObjectId)
 		}
 
-		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{CopyTo: path, CopyFrom: objectInstanceToCopyFrom.Path})
+		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{CopyTo: pathString, CopyFrom: objectInstanceToCopyFrom.Path})
 		if err != nil {
 			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %s to storage location %s, err: %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %s to storage location %s", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias)
