@@ -3,10 +3,22 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"emperror.dev/errors"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"os/signal"
+	"path"
+	"path/filepath"
+	"slices"
+	"sync"
+	"syscall"
+	"time"
+
+	"emperror.dev/errors"
 	configutil "github.com/je4/utils/v2/pkg/config"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/configuration"
@@ -20,17 +32,6 @@ import (
 	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"io"
-	"io/fs"
-	"log"
-	"os"
-	"os/signal"
-	"path"
-	"path/filepath"
-	"slices"
-	"sync"
-	"syscall"
-	"time"
 )
 
 const (
@@ -215,8 +216,8 @@ func main() {
 				}
 				for _, collection := range collections.Collections {
 
-					relevantStorageLocations := dlzaService.GetCheapestStorageLocationsForQuality(storageLocationsPb, int(collection.Quality))
-					if len(relevantStorageLocations) == 0 {
+					relevantStorageLocationsGrouped := dlzaService.GetCheapestStorageLocationsForQuality(storageLocationsPb, int(collection.Quality))
+					if len(relevantStorageLocationsGrouped) == 0 {
 						logger.Error().Msgf("collection %s does not have enough storage locations to gain the quality needed", collection.Alias)
 						continue
 					}
@@ -227,11 +228,11 @@ func main() {
 					}
 					checkDoesNotNeeded := false
 					if len(storageLocationDistribution.StorageLocationsCombinationsForCollections) == 1 {
-						for index, storageLocation := range relevantStorageLocations {
-							if !slices.Contains(storageLocationDistribution.StorageLocationsCombinationsForCollections[0].LocationsIds, storageLocation.Id) {
+						for index, storageLocation := range relevantStorageLocationsGrouped {
+							if !slices.Contains(storageLocationDistribution.StorageLocationsCombinationsForCollections[0].LocationsIds, storageLocation.Group) {
 								break
 							} else {
-								if len(relevantStorageLocations)-1 == index {
+								if len(relevantStorageLocationsGrouped)-1 == index {
 									checkDoesNotNeeded = true
 								}
 							}
@@ -242,7 +243,7 @@ func main() {
 					}
 					logger.Debug().Msgf("collection with alias %s should be checked for quality", collection.Alias)
 					var relevantStorageLocationsIds []string
-					for _, relevantStorageLocation := range relevantStorageLocations {
+					for _, relevantStorageLocation := range relevantStorageLocationsGrouped {
 						relevantStorageLocationsIds = append(relevantStorageLocationsIds, relevantStorageLocation.Id)
 					}
 					for {
@@ -257,7 +258,7 @@ func main() {
 							break
 						}
 						objectCash[object.Id] = object
-						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocations}}
+						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocationsGrouped}}
 						if len(objectCash) == conf.AmountOfWorkers {
 							for {
 								time.Sleep(time.Duration(conf.TimeToWaitWorker) * time.Second)
@@ -324,7 +325,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(obj.RelevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
 
 	for _, storageLocationToCopyTo := range storageLocationsToCopyTo {
-		storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstanceToCopyFrom.Size, Id: storageLocationToCopyTo.Id, Object: obj.ObjectToWorkWith})
+		storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeObjectLocation{Size: objectInstanceToCopyFrom.Size, Location: storageLocationToCopyTo, Object: obj.ObjectToWorkWith})
 		if err != nil {
 			logger.Error().Msgf("cannot get storagePartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot get storagePartition for storage location %s", storageLocationToCopyTo.Alias)

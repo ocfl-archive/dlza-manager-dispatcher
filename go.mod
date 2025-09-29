@@ -1,6 +1,6 @@
 module github.com/ocfl-archive/dlza-manager-dispatcher
 
-go 1.24.3
+go 1.25.1
 
 require (
 	emperror.dev/errors v0.8.1
