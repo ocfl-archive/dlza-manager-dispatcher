@@ -43,7 +43,36 @@ const (
 	newStatus    = "new"
 )
 
-var objectCash map[string]*dlzamanagerproto.Object
+type Cash struct {
+	mu         sync.Mutex
+	ObjectCash map[string]*dlzamanagerproto.Object
+}
+
+func (c *Cash) Add(obj *dlzamanagerproto.Object) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ObjectCash[obj.Id] = obj
+}
+
+func (c *Cash) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.ObjectCash)
+}
+
+func (c *Cash) GetKeys() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return maps.Keys(c.ObjectCash)
+}
+
+func (c *Cash) Delete(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.ObjectCash, id)
+}
+
+var cash *Cash
 
 type Job struct {
 	ObjectToWorkWith         *dlzamanagerproto.Object
@@ -65,12 +94,12 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 			err := checkObjectInstancesDistributionAndReact(context.Background(), dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
 			if err != nil {
 				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
-				delete(objectCash, obj.ObjectToWorkWith.Id)
+				cash.Delete(obj.ObjectToWorkWith.Id)
 				continue
 			}
 			logger.Info().Msgf("Worker ID: %d finished to process object with ID: %s", id, obj.ObjectToWorkWith.Id)
-			delete(objectCash, obj.ObjectToWorkWith.Id)
-			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, len(objectCash))
+			cash.Delete(obj.ObjectToWorkWith.Id)
+			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, cash.Len())
 		case <-time.After(time.Duration(workerWaitingTime) * time.Second):
 			//logger.Debug().Msgf("Timeout: no value received in %d second. Worker ID: %d", workerWaitingTime, id)
 		}
@@ -153,7 +182,7 @@ func main() {
 	defer clientLoader.Close()
 
 	logger.Info().Msgf("resolver address is %s", conf.ResolverAddr)
-	resolverClient, err := resolver.NewMiniresolverClient(conf.ResolverAddr, conf.GRPCClient, clientCert, nil, time.Duration(conf.ResolverTimeout), time.Duration(conf.ResolverNotFoundTimeout), logger)
+	resolverClient, err := resolver.NewMiniresolverClientNet(conf.ResolverAddr, conf.NetName, conf.GRPCClient, clientCert, nil, time.Duration(conf.ResolverTimeout), time.Duration(conf.ResolverNotFoundTimeout), logger)
 	if err != nil {
 		logger.Fatal().Msgf("cannot create resolver client: %v", err)
 	}
@@ -184,7 +213,7 @@ func main() {
 	}
 	logger.Info().Msg(msg.Id)
 	var wg sync.WaitGroup
-	objectCash = make(map[string]*dlzamanagerproto.Object)
+	cash = &Cash{ObjectCash: make(map[string]*dlzamanagerproto.Object)}
 	jobChan := make(chan Job)
 	workerWaitingTime = conf.WorkerWaitingTime
 	for i := 0; i < conf.AmountOfWorkers; i++ {
@@ -242,13 +271,13 @@ func main() {
 						continue
 					}
 					logger.Debug().Msgf("collection with alias %s should be checked for quality", collection.Alias)
-					var relevantStorageLocationsIds []string
+					var relevantStorageLocationsGroups []string
 					for _, relevantStorageLocation := range relevantStorageLocationsGrouped {
-						relevantStorageLocationsIds = append(relevantStorageLocationsIds, relevantStorageLocation.Id)
+						relevantStorageLocationsGroups = append(relevantStorageLocationsGroups, relevantStorageLocation.Group)
 					}
 					for {
 						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(),
-							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), CollectionsIds: relevantStorageLocationsIds})
+							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: cash.GetKeys(), CollectionsIds: relevantStorageLocationsGroups})
 						if err != nil {
 							logger.Debug().Msgf("cannot GetObjectsByCollectionAlias for collection: %s, %v", collection.Alias, err)
 							break
@@ -257,12 +286,12 @@ func main() {
 							logger.Debug().Msgf("All objects from collection with alias %s are archived with quality needed", collection.Alias)
 							break
 						}
-						objectCash[object.Id] = object
+						cash.Add(object)
 						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocationsGrouped}}
-						if len(objectCash) == conf.AmountOfWorkers {
+						if cash.Len() == conf.AmountOfWorkers {
 							for {
 								time.Sleep(time.Duration(conf.TimeToWaitWorker) * time.Second)
-								if len(objectCash) < conf.AmountOfWorkers {
+								if cash.Len() < conf.AmountOfWorkers {
 									break
 								}
 							}
