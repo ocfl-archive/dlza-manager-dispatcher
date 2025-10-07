@@ -1,4 +1,4 @@
-localaddr = ":8761"
+localaddr = ":0"
 domain = "ubdlza"
 resolveraddr = "[::1]:7777"
 resolvertimeout = "10m"
@@ -14,6 +14,11 @@ cyclelength = 600
 amountofworkers = 10
 timetowaitworker = 5
 workerwaitingtime = 1
+
+netname = "local"
+
+[addresses]
+local = ":0"
 
 ActionTemplateTimeout = "10s"
 

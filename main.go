@@ -3,10 +3,22 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"emperror.dev/errors"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"os/signal"
+	"path"
+	"path/filepath"
+	"slices"
+	"sync"
+	"syscall"
+	"time"
+
+	"emperror.dev/errors"
 	configutil "github.com/je4/utils/v2/pkg/config"
 	"github.com/je4/utils/v2/pkg/zLogger"
 	"github.com/ocfl-archive/dlza-manager-dispatcher/configuration"
@@ -20,17 +32,6 @@ import (
 	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"io"
-	"io/fs"
-	"log"
-	"os"
-	"os/signal"
-	"path"
-	"path/filepath"
-	"slices"
-	"sync"
-	"syscall"
-	"time"
 )
 
 const (
@@ -42,7 +43,36 @@ const (
 	newStatus    = "new"
 )
 
-var objectCash map[string]*dlzamanagerproto.Object
+type Cash struct {
+	mu         sync.Mutex
+	ObjectCash map[string]*dlzamanagerproto.Object
+}
+
+func (c *Cash) Add(obj *dlzamanagerproto.Object) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ObjectCash[obj.Id] = obj
+}
+
+func (c *Cash) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.ObjectCash)
+}
+
+func (c *Cash) GetKeys() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return maps.Keys(c.ObjectCash)
+}
+
+func (c *Cash) Delete(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.ObjectCash, id)
+}
+
+var cash *Cash
 
 type Job struct {
 	ObjectToWorkWith         *dlzamanagerproto.Object
@@ -64,12 +94,12 @@ func worker(id int, in <-chan Job, dispatcherHandlerServiceClient handlerClientP
 			err := checkObjectInstancesDistributionAndReact(context.Background(), dispatcherHandlerServiceClient, dispatcherStorageHandlerServiceClient, obj, logger)
 			if err != nil {
 				logger.Error().Msgf("cannot checkObjectInstancesDistributionAndReact for object with ID %s, err: %v", obj.ObjectToWorkWith.Id, err)
-				delete(objectCash, obj.ObjectToWorkWith.Id)
+				cash.Delete(obj.ObjectToWorkWith.Id)
 				continue
 			}
 			logger.Info().Msgf("Worker ID: %d finished to process object with ID: %s", id, obj.ObjectToWorkWith.Id)
-			delete(objectCash, obj.ObjectToWorkWith.Id)
-			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, len(objectCash))
+			cash.Delete(obj.ObjectToWorkWith.Id)
+			logger.Debug().Msgf("Worker ID: %d cleared cash. Cash length: %d", id, cash.Len())
 		case <-time.After(time.Duration(workerWaitingTime) * time.Second):
 			//logger.Debug().Msgf("Timeout: no value received in %d second. Worker ID: %d", workerWaitingTime, id)
 		}
@@ -183,7 +213,7 @@ func main() {
 	}
 	logger.Info().Msg(msg.Id)
 	var wg sync.WaitGroup
-	objectCash = make(map[string]*dlzamanagerproto.Object)
+	cash = &Cash{ObjectCash: make(map[string]*dlzamanagerproto.Object)}
 	jobChan := make(chan Job)
 	workerWaitingTime = conf.WorkerWaitingTime
 	for i := 0; i < conf.AmountOfWorkers; i++ {
@@ -215,8 +245,8 @@ func main() {
 				}
 				for _, collection := range collections.Collections {
 
-					relevantStorageLocations := dlzaService.GetCheapestStorageLocationsForQuality(storageLocationsPb, int(collection.Quality))
-					if len(relevantStorageLocations) == 0 {
+					relevantStorageLocationsGrouped := dlzaService.GetCheapestStorageLocationsForQuality(storageLocationsPb, int(collection.Quality))
+					if len(relevantStorageLocationsGrouped) == 0 {
 						logger.Error().Msgf("collection %s does not have enough storage locations to gain the quality needed", collection.Alias)
 						continue
 					}
@@ -227,11 +257,11 @@ func main() {
 					}
 					checkDoesNotNeeded := false
 					if len(storageLocationDistribution.StorageLocationsCombinationsForCollections) == 1 {
-						for index, storageLocation := range relevantStorageLocations {
-							if !slices.Contains(storageLocationDistribution.StorageLocationsCombinationsForCollections[0].LocationsIds, storageLocation.Id) {
+						for index, storageLocation := range relevantStorageLocationsGrouped {
+							if !slices.Contains(storageLocationDistribution.StorageLocationsCombinationsForCollections[0].LocationsIds, storageLocation.Group) {
 								break
 							} else {
-								if len(relevantStorageLocations)-1 == index {
+								if len(relevantStorageLocationsGrouped)-1 == index {
 									checkDoesNotNeeded = true
 								}
 							}
@@ -241,13 +271,13 @@ func main() {
 						continue
 					}
 					logger.Debug().Msgf("collection with alias %s should be checked for quality", collection.Alias)
-					var relevantStorageLocationsIds []string
-					for _, relevantStorageLocation := range relevantStorageLocations {
-						relevantStorageLocationsIds = append(relevantStorageLocationsIds, relevantStorageLocation.Id)
+					var relevantStorageLocationsGroups []string
+					for _, relevantStorageLocation := range relevantStorageLocationsGrouped {
+						relevantStorageLocationsGroups = append(relevantStorageLocationsGroups, relevantStorageLocation.Group)
 					}
 					for {
 						object, err := clientDispatcherHandler.GetObjectExceptListOlderThan(context.Background(),
-							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: maps.Keys(objectCash), CollectionsIds: relevantStorageLocationsIds})
+							&dlzamanagerproto.IdsWithSQLInterval{CollectionId: collection.Id, Ids: cash.GetKeys(), CollectionsIds: relevantStorageLocationsGroups})
 						if err != nil {
 							logger.Debug().Msgf("cannot GetObjectsByCollectionAlias for collection: %s, %v", collection.Alias, err)
 							break
@@ -256,12 +286,12 @@ func main() {
 							logger.Debug().Msgf("All objects from collection with alias %s are archived with quality needed", collection.Alias)
 							break
 						}
-						objectCash[object.Id] = object
-						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocations}}
-						if len(objectCash) == conf.AmountOfWorkers {
+						cash.Add(object)
+						jobChan <- Job{ObjectToWorkWith: object, RelevantStorageLocations: &dlzamanagerproto.StorageLocations{StorageLocations: relevantStorageLocationsGrouped}}
+						if cash.Len() == conf.AmountOfWorkers {
 							for {
 								time.Sleep(time.Duration(conf.TimeToWaitWorker) * time.Second)
-								if len(objectCash) < conf.AmountOfWorkers {
+								if cash.Len() < conf.AmountOfWorkers {
 									break
 								}
 							}
@@ -324,7 +354,7 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 	storageLocationsToDeleteFromWithObjectInstances := dlzaService.GetStorageLocationsToDeleteFrom(obj.RelevantStorageLocations, storageLocationsAndObjectInstancesCurrent)
 
 	for _, storageLocationToCopyTo := range storageLocationsToCopyTo {
-		storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeAndId{Size: objectInstanceToCopyFrom.Size, Id: storageLocationToCopyTo.Id, Object: obj.ObjectToWorkWith})
+		storagePartition, err := dispatcherHandlerServiceClient.GetStoragePartitionForLocation(ctx, &dlzamanagerproto.SizeObjectLocation{Size: objectInstanceToCopyFrom.Size, Location: storageLocationToCopyTo, Object: obj.ObjectToWorkWith})
 		if err != nil {
 			logger.Error().Msgf("cannot get storagePartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot get storagePartition for storage location %s", storageLocationToCopyTo.Alias)
