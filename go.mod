@@ -8,7 +8,7 @@ require (
 	github.com/je4/filesystem/v2 v2.0.15
 	github.com/je4/utils/v2 v2.0.60
 	github.com/ocfl-archive/dlza-manager v1.0.3-beta2
-	github.com/ocfl-archive/dlza-manager-handler v1.0.3-beta2
+	github.com/ocfl-archive/dlza-manager-handler v1.0.3-beta3
 	github.com/ocfl-archive/dlza-manager-storage-handler v1.0.3-beta2
 	gitlab.switch.ch/ub-unibas/go-ublogger/v2 v2.0.2-0.20250331093945-4f0f0ce8c72d
 	go.ub.unibas.ch/cloud/certloader/v2 v2.0.22
