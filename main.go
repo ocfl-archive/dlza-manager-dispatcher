@@ -359,12 +359,17 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 			logger.Error().Msgf("cannot get storagePartition for storage location %s, err: %v", storageLocationToCopyTo.Alias, err)
 			return errors.Wrapf(err, "cannot get storagePartition for storage location %s", storageLocationToCopyTo.Alias)
 		}
+		storageLocation, err := dispatcherHandlerServiceClient.GetStorageLocationById(ctx, &dlzamanagerproto.Id{Id: storagePartition.StorageLocationId})
+		if err != nil {
+			logger.Error().Msgf("cannot GetStorageLocationById for ID %s, err: %v", storagePartition.StorageLocationId, err)
+			return errors.Wrapf(err, "cannot GetStorageLocationById for ID %s", storagePartition.StorageLocationId)
+		}
 
 		connection := models.Connection{}
-		err = json.Unmarshal([]byte(storageLocationToCopyTo.Connection), &connection)
+		err = json.Unmarshal([]byte(storageLocation.Connection), &connection)
 		if err != nil {
 			logger.Error().Msgf("error mapping json")
-			return errors.Wrapf(err, "error mapping json for storageLocation: %s", storageLocationToCopyTo.Alias)
+			return errors.Wrapf(err, "error mapping json for storageLocation: %s", storageLocation.Alias)
 		}
 
 		pathString := path.Join(connection.Folder, storagePartition.Alias, filepath.Base(objectInstanceToCopyFrom.Path))
@@ -377,8 +382,8 @@ func checkObjectInstancesDistributionAndReact(ctx context.Context, dispatcherHan
 
 		_, err = dispatcherStorageHandlerServiceClient.CopyArchiveTo(ctx, &dlzamanagerproto.CopyFromTo{CopyTo: pathString, CopyFrom: objectInstanceToCopyFrom.Path})
 		if err != nil {
-			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %s to storage location %s, err: %v", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias, err)
-			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %s to storage location %s", objectInstanceToCopyFrom.Path, storageLocationToCopyTo.Alias)
+			logger.Error().Msgf("cannot CopyArchiveTo for object instance with path %s to storage location %s, err: %v", objectInstanceToCopyFrom.Path, storageLocation.Alias, err)
+			return errors.Wrapf(err, "cannot CopyArchiveTo for object instance with path %s to storage location %s", objectInstanceToCopyFrom.Path, storageLocation.Alias)
 		}
 	}
 	for objectInstanceToDelete := range storageLocationsToDeleteFromWithObjectInstances {
