@@ -29,7 +29,7 @@ import (
 	dlzaService "github.com/ocfl-archive/dlza-manager/service"
 	ublogger "gitlab.switch.ch/ub-unibas/go-ublogger/v2"
 	"go.ub.unibas.ch/cloud/certloader/v2/pkg/loader"
-	"go.ub.unibas.ch/cloud/miniresolver/v2/pkg/resolver"
+	"go.ub.unibas.ch/cloud/miniresolverclient/pkg/miniresolverclient"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -182,7 +182,7 @@ func main() {
 	defer clientLoader.Close()
 
 	logger.Info().Msgf("resolver address is %s", conf.ResolverAddr)
-	resolverClient, err := resolver.NewMiniresolverClientNet(conf.ResolverAddr, conf.NetName, conf.GRPCClient, clientCert, nil, time.Duration(conf.ResolverTimeout), time.Duration(conf.ResolverNotFoundTimeout), logger)
+	resolverClient, err := miniresolverclient.NewMiniresolverClientNet(conf.ResolverAddr, conf.NetName, conf.GRPCClient, clientCert, nil, time.Duration(conf.ResolverTimeout), time.Duration(conf.ResolverNotFoundTimeout), logger)
 	if err != nil {
 		logger.Fatal().Msgf("cannot create resolver client: %v", err)
 	}
@@ -190,7 +190,7 @@ func main() {
 
 	//////DispatcherHandler gRPC connection
 
-	clientDispatcherHandler, err := resolver.NewClient[handlerClientProto.DispatcherHandlerServiceClient](
+	clientDispatcherHandler, err := miniresolverclient.NewClient[handlerClientProto.DispatcherHandlerServiceClient](
 		resolverClient,
 		handlerClientProto.NewDispatcherHandlerServiceClient,
 		handlerClientProto.DispatcherHandlerService_ServiceDesc.ServiceName, conf.Domain)
@@ -200,7 +200,7 @@ func main() {
 
 	//////DispatcherStorageHandler gRPC connection
 
-	clientDispatcherStorageHandler, err := resolver.NewClient[storageHandlerClientProto.DispatcherStorageHandlerServiceClient](
+	clientDispatcherStorageHandler, err := miniresolverclient.NewClient[storageHandlerClientProto.DispatcherStorageHandlerServiceClient](
 		resolverClient,
 		storageHandlerClientProto.NewDispatcherStorageHandlerServiceClient,
 		storageHandlerClientProto.DispatcherStorageHandlerService_ServiceDesc.ServiceName, conf.Domain)
